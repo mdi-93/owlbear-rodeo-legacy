@@ -1,3 +1,4 @@
+
 import https from "https";
 
 export default class IceServer {
@@ -5,20 +6,18 @@ export default class IceServer {
   private cacheExpiresAt = 0;
   private refreshPromise: Promise<any> | null = null;
 
-  async getIceServers(): Promise<any> {
+  async getIceServers(clientIp?: string): Promise<any> {
     const now = Date.now();
 
-    // Reuse credentials until 5 minutes before expiration.
     if (this.cachedServers && now < this.cacheExpiresAt) {
       return this.cachedServers;
     }
 
-    // Avoid simultaneous requests to Turnix.
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
 
-    this.refreshPromise = this.fetchIceServers();
+    this.refreshPromise = this.fetchIceServers(clientIp);
 
     try {
       return await this.refreshPromise;
@@ -27,7 +26,7 @@ export default class IceServer {
     }
   }
 
-  private fetchIceServers(): Promise<any> {
+  private fetchIceServers(clientIp?: string): Promise<any> {
     const token = process.env.TURNIX_API_TOKEN;
 
     if (!token) {
@@ -39,15 +38,21 @@ export default class IceServer {
     return new Promise((resolve, reject) => {
       const body = JSON.stringify({ ttl: 3600 });
 
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": String(Buffer.byteLength(body)),
+      };
+
+      if (clientIp) {
+        headers["X-TURN-CLIENT-IP"] = clientIp;
+      }
+
       const req = https.request(
         "https://turnix.io/api/v1/credentials/ice",
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "Content-Length": Buffer.byteLength(body),
-          },
+          headers,
         },
         (res) => {
           let data = "";
@@ -58,7 +63,9 @@ export default class IceServer {
 
           res.on("end", () => {
             if (res.statusCode !== 200) {
-              reject(new Error(`Turnix API returned ${res.statusCode}`));
+              reject(
+                new Error(`Turnix API returned ${res.statusCode}: ${data}`)
+              );
               return;
             }
 
@@ -70,8 +77,18 @@ export default class IceServer {
                 return;
               }
 
-              this.cachedServers = result.iceServers;
-              this.cacheExpiresAt = Date.now() + 55 * 60 * 1000;
+              const expiresAt = new Date(result.expiresAt).getTime();
+
+              if (!Number.isFinite(expiresAt)) {
+                reject(new Error("Invalid Turnix credential expiration"));
+                return;
+              }
+
+              this.cachedServers = {
+                iceServers: result.iceServers,
+              };
+
+              this.cacheExpiresAt = expiresAt - 5 * 60 * 1000;
 
               resolve(this.cachedServers);
             } catch (error) {
