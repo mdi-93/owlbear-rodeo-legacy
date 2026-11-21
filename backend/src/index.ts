@@ -1,3 +1,4 @@
+
 import cors, { CorsOptions } from "cors";
 import express, { Application, RequestHandler } from "express";
 import helmet from "helmet";
@@ -13,6 +14,10 @@ import IceServer from "./entities/IceServer";
 import IceServerController from "./controllers/IceServerController";
 
 const app: Application = express();
+
+// Trust Render's reverse proxy.
+app.set("trust proxy", 1);
+
 const port: string | number = Global.CONNECTION_PORT;
 const server = new AppServer(app, port);
 
@@ -44,7 +49,6 @@ const corsConfig: CorsOptions = {
 const iceServer = new IceServer();
 
 const globalMiddleware: Array<RequestHandler> = [helmet(), cors(corsConfig)];
-
 const controllers: Array<Controller> = [
   new HealthcheckController(),
   new IceServerController(iceServer),
@@ -62,7 +66,6 @@ process.once("SIGTERM", () => {
   server.close(() => {
     console.log("http server closed");
   });
-
   io.close(() => {
     console.log("socket server closed");
     io.sockets.emit("server shutdown");
@@ -75,5 +78,4 @@ process.once("SIGTERM", () => {
 
 process.on("unhandledRejection", (reason, p) => {
   console.log("Unhandled Rejection at: Promise", p, "reason:", reason);
-  // application specific logging, throwing an error, or other logic here
 });
