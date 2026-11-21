@@ -1,5 +1,5 @@
 
-import { NextFunction, Request, Response } from "express";
+import { Request, Response } from "express";
 import IceServer from "../entities/IceServer";
 import Controller, { Methods } from "./Controller";
 
@@ -26,10 +26,9 @@ export default class IceServerController extends Controller {
 
   async handleIceServerConnection(
     req: Request,
-    res: Response,
-    next: NextFunction
+    res: Response
   ): Promise<void> {
-    const ip = req.ip;
+    const ip = req.ip || "unknown";
     const now = Date.now();
     const limit = 30;
     const windowMs = 60 * 1000;
@@ -49,11 +48,13 @@ export default class IceServerController extends Controller {
     }
 
     try {
-      const servers = await this.iceServer.getIceServers();
+      const servers = await this.iceServer.getIceServers(ip);
       res.json(servers);
     } catch (error) {
       console.error("ICE server error:", error);
-      res.status(500).send({ error: "Unable to retrieve ICE servers" });
+      res.status(500).send({
+        error: "Unable to retrieve ICE servers",
+      });
     }
   }
 }
