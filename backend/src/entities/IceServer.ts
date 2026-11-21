@@ -29,18 +29,18 @@ export default class IceServer {
   private fetchIceServers(clientIp?: string): Promise<any> {
     const token = process.env.TURNIX_API_TOKEN;
 
-//    if (!token) {
-//      return Promise.reject(
-//        new Error("TURNIX_API_TOKEN is not configured")
-//      );
-//    }
     if (!token) {
-      return Promise.resolve({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" }
-        ]
-      });
+      return Promise.reject(
+        new Error("TURNIX_API_TOKEN is not configured")
+      );
     }
+//    if (!token) {
+//      return Promise.resolve({
+//        iceServers: [
+//          { urls: "stun:stun.l.google.com:19302" }
+//        ]
+//      });
+//    }
 
     return new Promise((resolve, reject) => {
       const body = JSON.stringify({ ttl: 3600 });
